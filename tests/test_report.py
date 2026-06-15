@@ -97,3 +97,18 @@ def test_render_comparison_table_shows_references_and_costs():
     assert "haiku" in out
     assert "Would-have-cost" in out
     assert "$20.00" in out
+
+
+def test_build_comparison_matrix_costs_per_model():
+    per_model = [
+        {"model": "qwen", "prompt_tokens": 1_000_000, "completion_tokens": 0, "total_tokens": 1_000_000},
+        {"model": "tiny", "prompt_tokens": 0, "completion_tokens": 1_000_000, "total_tokens": 1_000_000},
+    ]
+    rows = report.build_comparison_matrix(per_model, REFS)
+    by = {r["model"]: r for r in rows}
+    # qwen: prompt only -> opus 10*1=10, haiku 1*1=1
+    assert round(by["qwen"]["costs"]["opus"], 4) == 10.0
+    assert round(by["qwen"]["costs"]["haiku"], 4) == 1.0
+    # tiny: completion only -> opus 20*1=20, haiku 2*1=2
+    assert round(by["tiny"]["costs"]["opus"], 4) == 20.0
+    assert by["qwen"]["total_tokens"] == 1_000_000

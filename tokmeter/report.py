@@ -84,6 +84,27 @@ def render_comparison_table(rows: list[dict]) -> Table:
     return table
 
 
+def build_comparison_matrix(per_model_rows: list[dict], references: list) -> list[dict]:
+    out = []
+    for row in per_model_rows:
+        costs = {
+            name: pricing_mod.compute_savings(
+                row.get("prompt_tokens", 0), row.get("completion_tokens", 0), rate
+            )
+            for name, rate in references
+        }
+        out.append(
+            {
+                "model": row.get("model"),
+                "prompt_tokens": row.get("prompt_tokens", 0),
+                "completion_tokens": row.get("completion_tokens", 0),
+                "total_tokens": row.get("total_tokens", 0),
+                "costs": costs,
+            }
+        )
+    return out
+
+
 def build_comparison(prompt_tokens: int, completion_tokens: int, references: list) -> list[dict]:
     rows = []
     for name, rate in references:
