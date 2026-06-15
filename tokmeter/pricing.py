@@ -67,9 +67,11 @@ def compute_savings(prompt_tokens: int, completion_tokens: int, rate: Rate) -> f
     return p + c
 
 
-def _to_float(value, default: float = 0.0) -> float:
+def _to_float(value: object, default: float = 0.0) -> float:
+    # References come from user-supplied YAML; coerce leniently so a typo'd or
+    # missing price falls back to 0.0 instead of crashing `tokmeter compare`.
     try:
-        return float(value)
+        return float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return default
 

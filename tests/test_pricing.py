@@ -71,3 +71,9 @@ def test_reference_rates_tolerates_non_numeric_price():
     refs = pricing.reference_rates({"references": {"x": {"input_per_1m": "oops"}}})
     assert dict(refs)["x"].input_per_1m == 0.0
     assert dict(refs)["x"].output_per_1m == 0.0
+
+
+def test_reference_rates_tolerates_none_spec():
+    refs = pricing.reference_rates({"references": {"x": None}})
+    assert dict(refs)["x"].input_per_1m == 0.0
+    assert dict(refs)["x"].output_per_1m == 0.0
