@@ -1,0 +1,11 @@
+# Cloud-equivalent prices used to estimate savings from running locally.
+# USD per 1,000,000 tokens. Edit freely; reports re-price history retroactively.
+default:
+  input_per_1m: 0.15
+  output_per_1m: 0.60
+
+models:
+  Qwen3.6-27B-UD-Q6_K_XL:
+    input_per_1m: 0.15
+    output_per_1m: 0.60
+    comparable: gpt-4o-mini   # free-form note for yourself
