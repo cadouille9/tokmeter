@@ -66,3 +66,19 @@ def totals(rows: list[dict]) -> dict:
         "total_tokens": sum(r.get("total_tokens", 0) for r in rows),
         "saved_usd": sum(r.get("saved_usd", 0.0) for r in rows),
     }
+
+
+def build_comparison(prompt_tokens: int, completion_tokens: int, references: list) -> list[dict]:
+    rows = []
+    for name, rate in references:
+        cost = pricing_mod.compute_savings(prompt_tokens, completion_tokens, rate)
+        rows.append(
+            {
+                "reference": name,
+                "input_per_1m": rate.input_per_1m,
+                "output_per_1m": rate.output_per_1m,
+                "would_cost": cost,
+            }
+        )
+    rows.sort(key=lambda r: r["would_cost"], reverse=True)
+    return rows

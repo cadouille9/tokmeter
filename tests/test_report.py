@@ -4,6 +4,16 @@ import io
 from rich.console import Console
 
 from tokmeter import report
+from tokmeter import pricing as pricing_for_tests
+
+REFS = pricing_for_tests.reference_rates(
+    {
+        "references": {
+            "opus": {"input_per_1m": 10.0, "output_per_1m": 20.0},
+            "haiku": {"input_per_1m": 1.0, "output_per_1m": 2.0},
+        }
+    }
+)
 
 
 def render_to_text(table, width=200):
@@ -63,3 +73,18 @@ def test_render_table_name_column_folds_instead_of_truncating():
     # overflow="fold" preserves the full name when space is tight, instead of
     # silently dropping characters with an ellipsis.
     assert table.columns[0].overflow == "fold"
+
+
+def test_build_comparison_computes_cost_and_sorts_desc():
+    rows = report.build_comparison(1_000_000, 500_000, REFS)
+    # opus: 10*1 + 20*0.5 = 20.0 ; haiku: 1*1 + 2*0.5 = 2.0
+    assert rows[0]["reference"] == "opus"
+    assert round(rows[0]["would_cost"], 4) == 20.0
+    assert rows[1]["reference"] == "haiku"
+    assert round(rows[1]["would_cost"], 4) == 2.0
+    assert rows[0]["input_per_1m"] == 10.0
+    assert rows[0]["output_per_1m"] == 20.0
+
+
+def test_build_comparison_empty_references():
+    assert report.build_comparison(1000, 1000, []) == []
