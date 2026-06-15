@@ -66,7 +66,8 @@ def _cmd_models(args) -> int:
     for model in sorted(db.distinct_models(conn)):
         rate = pricing.resolve_rate(pricing_data, model)
         state = "priced" if rate.mapped else "default"
-        console.print(f"{model}  [{state}]")
+        # markup=False so the bracketed state isn't parsed as Rich style markup.
+        console.print(f"{model}  [{state}]", markup=False)
     return 0
 
 

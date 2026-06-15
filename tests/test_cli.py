@@ -47,3 +47,6 @@ def test_models_lists_mapped_state(tmp_path, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert rc == 0
     assert "m1" in out
+    # The pricing-state label must survive Rich rendering (regression: [default]
+    # was being interpreted as Rich markup and silently dropped).
+    assert "[default]" in out
