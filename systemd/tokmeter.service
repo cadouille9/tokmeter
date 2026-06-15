@@ -1,0 +1,14 @@
+[Unit]
+Description=tokmeter local LLM usage proxy
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=%h/dev/tokmeter/.venv/bin/tokmeter serve
+Environment=TOKMETER_PORT=8079
+Environment=TOKMETER_UPSTREAM=http://127.0.0.1:8080
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
