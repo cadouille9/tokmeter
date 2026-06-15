@@ -68,6 +68,22 @@ def totals(rows: list[dict]) -> dict:
     }
 
 
+def render_comparison_table(rows: list[dict]) -> Table:
+    table = Table(title="Would-have-cost on cloud (= savings vs each)")
+    table.add_column("Reference", overflow="fold")
+    table.add_column("In $/1M", justify="right")
+    table.add_column("Out $/1M", justify="right")
+    table.add_column("Would-have-cost", justify="right")
+    for r in rows:
+        table.add_row(
+            str(r["reference"]),
+            f"{r['input_per_1m']:.2f}",
+            f"{r['output_per_1m']:.2f}",
+            f"${r['would_cost']:.2f}",
+        )
+    return table
+
+
 def build_comparison(prompt_tokens: int, completion_tokens: int, references: list) -> list[dict]:
     rows = []
     for name, rate in references:

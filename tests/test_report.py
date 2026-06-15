@@ -88,3 +88,12 @@ def test_build_comparison_computes_cost_and_sorts_desc():
 
 def test_build_comparison_empty_references():
     assert report.build_comparison(1000, 1000, []) == []
+
+
+def test_render_comparison_table_shows_references_and_costs():
+    rows = report.build_comparison(1_000_000, 500_000, REFS)
+    out = render_to_text(report.render_comparison_table(rows))
+    assert "opus" in out
+    assert "haiku" in out
+    assert "Would-have-cost" in out
+    assert "$20.00" in out
