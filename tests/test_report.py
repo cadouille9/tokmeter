@@ -1,6 +1,15 @@
 import csv
+import io
+
+from rich.console import Console
 
 from tokmeter import report
+
+
+def render_to_text(table, width=200):
+    console = Console(file=io.StringIO(), width=width)
+    console.print(table)
+    return console.file.getvalue()
 
 PRICING = {
     "default": {"input_per_1m": 0.15, "output_per_1m": 0.60},
@@ -39,3 +48,18 @@ def test_render_table_returns_table_with_title():
     table = report.render_table(rows, key="model", title="By Model")
     assert table.title == "By Model"
     assert table.row_count == 2
+
+
+def test_render_table_model_view_marks_default_pricing():
+    rows = report.build_rows(AGG, PRICING, key="model")  # m1 mapped, m2 default
+    out = render_to_text(report.render_table(rows, key="model", title="t"))
+    assert "default" in out  # m2 falls back to default pricing
+
+
+def test_render_table_name_column_folds_instead_of_truncating():
+    table = report.render_table(
+        report.build_rows(AGG, PRICING, key="model"), key="model", title="t"
+    )
+    # overflow="fold" preserves the full name when space is tight, instead of
+    # silently dropping characters with an ellipsis.
+    assert table.columns[0].overflow == "fold"

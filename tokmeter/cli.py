@@ -41,7 +41,7 @@ def _cmd_report(args) -> int:
         key, title = "day", "Usage by Day"
     else:
         agg = db.aggregate_by_model(conn, since=args.since, until=args.until, model=args.model)
-        key, title = "model", "Usage by Model (* = default pricing)"
+        key, title = "model", "Usage by Model"
 
     rows = report.build_rows(agg, pricing_data, key=key)
 

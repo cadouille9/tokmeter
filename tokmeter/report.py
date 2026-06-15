@@ -33,24 +33,28 @@ def write_csv(rows: list[dict], path: Path) -> None:
 
 def render_table(rows: list[dict], key: str, title: str) -> Table:
     table = Table(title=title)
-    table.add_column(key.capitalize())
+    # fold (not the default ellipsis) so long model names are never silently truncated.
+    table.add_column(key.capitalize(), overflow="fold")
     table.add_column("Requests", justify="right")
     table.add_column("Prompt", justify="right")
     table.add_column("Completion", justify="right")
     table.add_column("Total", justify="right")
     table.add_column("Saved $", justify="right")
+    show_pricing = key == "model"
+    if show_pricing:
+        table.add_column("Pricing")
     for r in rows:
-        label = str(r.get(key, ""))
-        if key == "model" and not r.get("mapped", True):
-            label += " *"
-        table.add_row(
-            label,
+        cells = [
+            str(r.get(key, "")),
             str(r.get("requests", "")),
             f"{r.get('prompt_tokens', 0):,}",
             f"{r.get('completion_tokens', 0):,}",
             f"{r.get('total_tokens', 0):,}",
             f"{r.get('saved_usd', 0.0):.2f}",
-        )
+        ]
+        if show_pricing:
+            cells.append("" if r.get("mapped", True) else "default")
+        table.add_row(*cells)
     return table
 
 
