@@ -76,10 +76,10 @@ def render_comparison_table(rows: list[dict]) -> Table:
     table.add_column("Would-have-cost", justify="right")
     for r in rows:
         table.add_row(
-            str(r["reference"]),
-            f"{r['input_per_1m']:.2f}",
-            f"{r['output_per_1m']:.2f}",
-            f"${r['would_cost']:.2f}",
+            str(r.get("reference", "")),
+            f"{r.get('input_per_1m', 0.0):.2f}",
+            f"{r.get('output_per_1m', 0.0):.2f}",
+            f"${r.get('would_cost', 0.0):.2f}",
         )
     return table
 
@@ -122,6 +122,8 @@ def render_matrix_table(rows: list[dict], reference_names: list[str]) -> Table:
 def build_comparison(prompt_tokens: int, completion_tokens: int, references: list) -> list[dict]:
     rows = []
     for name, rate in references:
+        # compute_savings is just tokens x rate; here that product is the
+        # would-have-cost on this reference (== savings vs it, since local is free).
         cost = pricing_mod.compute_savings(prompt_tokens, completion_tokens, rate)
         rows.append(
             {

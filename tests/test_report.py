@@ -111,6 +111,7 @@ def test_build_comparison_matrix_costs_per_model():
     assert round(by["qwen"]["costs"]["haiku"], 4) == 1.0
     # tiny: completion only -> opus 20*1=20, haiku 2*1=2
     assert round(by["tiny"]["costs"]["opus"], 4) == 20.0
+    assert round(by["tiny"]["costs"]["haiku"], 4) == 2.0
     assert by["qwen"]["total_tokens"] == 1_000_000
 
 
