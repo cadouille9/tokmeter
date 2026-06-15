@@ -47,3 +47,27 @@ def test_load_pricing_missing_file_returns_builtin_default(tmp_path):
     data = pricing.load_pricing(p)
     assert "default" in data
     assert data["default"]["input_per_1m"] >= 0
+
+
+def test_reference_rates_parses_entries_in_order():
+    p = {
+        "references": {
+            "claude-opus-4-8": {"input_per_1m": 5.0, "output_per_1m": 25.0},
+            "claude-sonnet-4-6": {"input_per_1m": 3.0, "output_per_1m": 15.0},
+        }
+    }
+    refs = pricing.reference_rates(p)
+    assert [name for name, _ in refs] == ["claude-opus-4-8", "claude-sonnet-4-6"]
+    rate = dict(refs)["claude-opus-4-8"]
+    assert rate.input_per_1m == 5.0
+    assert rate.output_per_1m == 25.0
+
+
+def test_reference_rates_empty_when_section_absent():
+    assert pricing.reference_rates({"default": {"input_per_1m": 0.1, "output_per_1m": 0.2}}) == []
+
+
+def test_reference_rates_tolerates_non_numeric_price():
+    refs = pricing.reference_rates({"references": {"x": {"input_per_1m": "oops"}}})
+    assert dict(refs)["x"].input_per_1m == 0.0
+    assert dict(refs)["x"].output_per_1m == 0.0

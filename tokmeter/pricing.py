@@ -65,3 +65,28 @@ def compute_savings(prompt_tokens: int, completion_tokens: int, rate: Rate) -> f
     p = (prompt_tokens or 0) / 1_000_000 * rate.input_per_1m
     c = (completion_tokens or 0) / 1_000_000 * rate.output_per_1m
     return p + c
+
+
+def _to_float(value, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def reference_rates(pricing: dict) -> list[tuple[str, Rate]]:
+    refs = pricing.get("references") or {}
+    out: list[tuple[str, Rate]] = []
+    for name, spec in refs.items():
+        spec = spec or {}
+        out.append(
+            (
+                name,
+                Rate(
+                    input_per_1m=_to_float(spec.get("input_per_1m")),
+                    output_per_1m=_to_float(spec.get("output_per_1m")),
+                    mapped=True,
+                ),
+            )
+        )
+    return out
