@@ -71,6 +71,39 @@ def _cmd_models(args) -> int:
     return 0
 
 
+def _cmd_compare(args) -> int:
+    conn = db.connect(config.db_path())
+    db.init_db(conn)
+    pricing_data = pricing.load_pricing(config.pricing_path())
+    references = pricing.reference_rates(pricing_data)
+    if not references:
+        console.print(
+            "No reference models configured. Add a 'references:' section to "
+            f"{config.pricing_path()} (see config/pricing.yaml for an example)."
+        )
+        return 0
+
+    per_model = db.aggregate_by_model(
+        conn, since=args.since, until=args.until, model=args.model
+    )
+
+    if args.by_model:
+        rows = report.build_comparison_matrix(per_model, references)
+        names = [name for name, _ in references]
+        console.print(report.render_matrix_table(rows, names))
+        return 0
+
+    prompt_tokens = sum(r.get("prompt_tokens", 0) for r in per_model)
+    completion_tokens = sum(r.get("completion_tokens", 0) for r in per_model)
+    console.print(
+        f"[bold]Recorded usage:[/] {prompt_tokens:,} prompt + "
+        f"{completion_tokens:,} completion tokens"
+    )
+    rows = report.build_comparison(prompt_tokens, completion_tokens, references)
+    console.print(report.render_comparison_table(rows))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="tokmeter", description="Local LLM usage tracker")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -86,6 +119,15 @@ def build_parser() -> argparse.ArgumentParser:
     rp.set_defaults(func=_cmd_report)
 
     sub.add_parser("models", help="List models seen and pricing state").set_defaults(func=_cmd_models)
+
+    cp = sub.add_parser("compare", help="Compare cost vs reference cloud models")
+    cp.add_argument("--since", help="YYYY-MM-DD (inclusive)")
+    cp.add_argument("--until", help="YYYY-MM-DD (inclusive)")
+    cp.add_argument("--model", help="Filter to one local model")
+    cp.add_argument(
+        "--by-model", action="store_true", help="Matrix: local models x references"
+    )
+    cp.set_defaults(func=_cmd_compare)
     return parser
 
 
