@@ -112,3 +112,17 @@ def test_build_comparison_matrix_costs_per_model():
     # tiny: completion only -> opus 20*1=20, haiku 2*1=2
     assert round(by["tiny"]["costs"]["opus"], 4) == 20.0
     assert by["qwen"]["total_tokens"] == 1_000_000
+
+
+def test_render_matrix_table_has_model_and_reference_columns():
+    per_model = [
+        {"model": "qwen", "prompt_tokens": 1_000_000, "completion_tokens": 0, "total_tokens": 1_000_000},
+    ]
+    rows = report.build_comparison_matrix(per_model, REFS)
+    table = report.render_matrix_table(rows, ["opus", "haiku"])
+    out = render_to_text(table)
+    assert table.columns[0].overflow == "fold"
+    assert "qwen" in out
+    assert "opus" in out
+    assert "haiku" in out
+    assert "$10.00" in out

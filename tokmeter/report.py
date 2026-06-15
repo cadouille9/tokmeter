@@ -105,6 +105,20 @@ def build_comparison_matrix(per_model_rows: list[dict], references: list) -> lis
     return out
 
 
+def render_matrix_table(rows: list[dict], reference_names: list[str]) -> Table:
+    table = Table(title="Would-have-cost by model")
+    table.add_column("Model", overflow="fold")
+    table.add_column("Total", justify="right")
+    for name in reference_names:
+        table.add_column(name, justify="right")
+    for r in rows:
+        cells = [str(r.get("model", "")), f"{r.get('total_tokens', 0):,}"]
+        for name in reference_names:
+            cells.append(f"${r['costs'].get(name, 0.0):.2f}")
+        table.add_row(*cells)
+    return table
+
+
 def build_comparison(prompt_tokens: int, completion_tokens: int, references: list) -> list[dict]:
     rows = []
     for name, rate in references:
