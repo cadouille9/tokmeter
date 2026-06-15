@@ -26,6 +26,10 @@ _DROP_RESP_HEADERS = {
 }
 _DROP_REQ_HEADERS = {"host", "content-length"}
 
+# Only these endpoints carry token usage worth logging. Everything else (web UI,
+# static assets, /health, /props, /v1/models, ...) is forwarded but not recorded.
+_TRACKED_ENDPOINTS = {"chat/completions", "completions", "embeddings"}
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -56,6 +60,7 @@ def create_app(*, upstream: str, writer, client: httpx.AsyncClient | None = None
         body = await request.body()
         path = request.url.path
         endpoint = usage_mod.classify_endpoint(path)
+        record = endpoint in _TRACKED_ENDPOINTS
 
         wants_stream = usage_mod.request_wants_stream(body)
         fwd_body = usage_mod.inject_include_usage(body) if wants_stream else body
@@ -70,7 +75,17 @@ def create_app(*, upstream: str, writer, client: httpx.AsyncClient | None = None
         upstream_req = client.build_request(
             request.method, target, headers=req_headers, content=fwd_body
         )
-        resp = await client.send(upstream_req, stream=True)
+        try:
+            resp = await client.send(upstream_req, stream=True)
+        except httpx.RequestError as exc:
+            # Upstream unreachable/timed out: return a clean 502 (no traceback,
+            # no usage record) instead of letting the handler 500.
+            log.warning("upstream %s unreachable: %s", upstream, exc)
+            return Response(
+                content=b'{"error": "tokmeter: upstream unreachable"}',
+                status_code=502,
+                media_type="application/json",
+            )
 
         resp_headers = [(k, v) for k, v in resp.headers.items() if k.lower() not in _DROP_RESP_HEADERS]
         content_type = resp.headers.get("content-type", "")
@@ -78,32 +93,35 @@ def create_app(*, upstream: str, writer, client: httpx.AsyncClient | None = None
 
         if is_sse:
             return _stream_response(
-                resp, resp_headers, endpoint, upstream, writer, started
+                resp, resp_headers, endpoint, upstream, writer, started, record
             )
 
         raw = await resp.aread()
         await resp.aclose()
-        duration_ms = int((time.monotonic() - started) * 1000)
-        parsed = usage_mod.parse_json_body(raw)
-        _safe_write(
-            writer,
-            UsageRecord(
-                ts=_now_iso(),
-                model=parsed.model,
-                endpoint=endpoint,
-                prompt_tokens=parsed.prompt_tokens,
-                completion_tokens=parsed.completion_tokens,
-                total_tokens=parsed.total_tokens,
-                duration_ms=duration_ms,
-                tokens_per_sec=parsed.tokens_per_sec,
-                stream=0,
-                status=resp.status_code,
-                upstream=upstream,
-            ),
-        )
+        if record:
+            duration_ms = int((time.monotonic() - started) * 1000)
+            parsed = usage_mod.parse_json_body(raw)
+            _safe_write(
+                writer,
+                UsageRecord(
+                    ts=_now_iso(),
+                    model=parsed.model,
+                    endpoint=endpoint,
+                    prompt_tokens=parsed.prompt_tokens,
+                    completion_tokens=parsed.completion_tokens,
+                    total_tokens=parsed.total_tokens,
+                    duration_ms=duration_ms,
+                    tokens_per_sec=parsed.tokens_per_sec,
+                    stream=0,
+                    status=resp.status_code,
+                    upstream=upstream,
+                ),
+            )
         return Response(content=raw, status_code=resp.status_code, headers=dict(resp_headers))
 
-    def _stream_response(resp, resp_headers, endpoint, upstream, writer, started) -> StreamingResponse:
+    def _stream_response(
+        resp, resp_headers, endpoint, upstream, writer, started, record
+    ) -> StreamingResponse:
         chunks: list[bytes] = []
 
         async def body_iterator():
@@ -113,6 +131,8 @@ def create_app(*, upstream: str, writer, client: httpx.AsyncClient | None = None
                     yield chunk
             finally:
                 await resp.aclose()
+                if not record:
+                    return
                 duration_ms = int((time.monotonic() - started) * 1000)
                 raw_text = b"".join(chunks).decode("utf-8", errors="replace")
                 parsed = usage_mod.parse_sse_text(raw_text)

@@ -2,7 +2,7 @@ import json
 
 import httpx
 from starlette.applications import Starlette
-from starlette.responses import JSONResponse, StreamingResponse
+from starlette.responses import JSONResponse, PlainTextResponse, StreamingResponse
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
@@ -74,6 +74,63 @@ def test_non_streaming_capture_failure_does_not_break_response(monkeypatch):
     resp = client.post("/v1/chat/completions", json={"model": "m1", "messages": []})
     assert resp.status_code == 200
     assert resp.json()["model"] == "m1"
+
+
+def fake_upstream_with_root():
+    async def chat(request):
+        return JSONResponse(
+            {
+                "model": "m1",
+                "usage": {"prompt_tokens": 5, "completion_tokens": 2, "total_tokens": 7},
+            }
+        )
+
+    async def root(request):
+        return PlainTextResponse("<html>llama.cpp webui</html>")
+
+    return Starlette(
+        routes=[
+            Route("/v1/chat/completions", chat, methods=["POST"]),
+            Route("/", root, methods=["GET"]),
+            Route("/health", root, methods=["GET"]),
+        ]
+    )
+
+
+def test_non_llm_request_is_forwarded_but_not_recorded():
+    writer = RecordingWriter()
+    app = create_app(
+        upstream="http://upstream", writer=writer, client=make_client_for(fake_upstream_with_root())
+    )
+    client = TestClient(app)
+
+    # The UI/static/health traffic must still pass through (transparent proxy)...
+    assert client.get("/").status_code == 200
+    assert "webui" in client.get("/").text
+    assert client.get("/health").status_code == 200
+    # ...but must NOT be logged as usage (only LLM endpoints are recorded).
+    assert writer.records == []
+
+    # A real LLM call IS recorded.
+    client.post("/v1/chat/completions", json={"model": "m1", "messages": []})
+    assert len(writer.records) == 1
+    assert writer.records[0].endpoint == "chat/completions"
+
+
+def test_upstream_unreachable_returns_502_and_records_nothing():
+    writer = RecordingWriter()
+
+    def boom(request):
+        raise httpx.ConnectError("connection refused")
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(boom), base_url="http://upstream")
+    app = create_app(upstream="http://upstream", writer=writer, client=client)
+    tc = TestClient(app)
+
+    resp = tc.post("/v1/chat/completions", json={"model": "m1", "messages": []})
+
+    assert resp.status_code == 502
+    assert writer.records == []
 
 
 def fake_sse_upstream(captured):
