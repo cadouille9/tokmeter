@@ -25,11 +25,30 @@ def load_pricing(path: Path) -> dict:
     return data
 
 
+def _normalize(name: str) -> str:
+    # Forgiving match: case-insensitive, ignoring a trailing .gguf, so a config
+    # key like "Qwen3.6-27B-UD-Q6_K_XL" matches the server-reported
+    # "Qwen3.6-27B-UD-Q6_K_XL.gguf" (and quant-case variations).
+    n = name.strip().lower()
+    if n.endswith(".gguf"):
+        n = n[: -len(".gguf")]
+    return n
+
+
 def resolve_rate(pricing: dict, model: str | None) -> Rate:
     models = pricing.get("models", {})
     default = pricing.get("default", BUILTIN_DEFAULT["default"])
-    if model and model in models:
-        m = models[model]
+    m = None
+    if model:
+        if model in models:  # exact match wins
+            m = models[model]
+        else:
+            target = _normalize(model)
+            for key, val in models.items():
+                if _normalize(key) == target:
+                    m = val
+                    break
+    if m is not None:
         return Rate(
             input_per_1m=float(m.get("input_per_1m", default["input_per_1m"])),
             output_per_1m=float(m.get("output_per_1m", default["output_per_1m"])),

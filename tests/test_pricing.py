@@ -15,6 +15,20 @@ def test_resolve_mapped_model():
     assert rate.mapped is True
 
 
+def test_resolve_matches_despite_gguf_suffix():
+    # llama.cpp reports e.g. "Qwen3.6-27B-UD-Q6_K_XL.gguf"; the config key omits .gguf.
+    rate = pricing.resolve_rate(PRICING, "Qwen3.6-27B-UD-Q6_K_XL.gguf")
+    assert rate.input_per_1m == 0.30
+    assert rate.output_per_1m == 1.20
+    assert rate.mapped is True
+
+
+def test_resolve_matches_case_insensitively():
+    rate = pricing.resolve_rate(PRICING, "qwen3.6-27b-ud-q6_k_xl")
+    assert rate.input_per_1m == 0.30
+    assert rate.mapped is True
+
+
 def test_resolve_unmapped_falls_back_to_default():
     rate = pricing.resolve_rate(PRICING, "some-other-model")
     assert rate.input_per_1m == 0.15

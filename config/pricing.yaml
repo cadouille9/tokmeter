@@ -1,11 +1,15 @@
 # Cloud-equivalent prices used to estimate savings from running locally.
 # USD per 1,000,000 tokens. Edit freely; reports re-price history retroactively.
+#
+# Model keys are matched against the name the server reports (see `tokmeter models`).
+# Matching is forgiving: case-insensitive and a trailing ".gguf" is ignored, so
+# "Qwen3.6-27B-UD-Q6_K_XL" also matches "Qwen3.6-27B-UD-Q6_K_XL.gguf".
 default:
   input_per_1m: 0.15
   output_per_1m: 0.60
 
 models:
-  Qwen3.6-27B-UD-Q6_K_XL:
+  Qwen3.6-27B-UD-Q6_K_XL.gguf:
     input_per_1m: 0.15
     output_per_1m: 0.60
     comparable: gpt-4o-mini   # free-form note for yourself
