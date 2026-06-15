@@ -39,8 +39,10 @@ standard final usage chunk.
     .venv/bin/tokmeter report --by model --csv usage.csv
     .venv/bin/tokmeter models                 # models seen + pricing state
 
-`*` next to a model (and `[default]` in `models`) means it has no entry in
-`~/.config/tokmeter/pricing.yaml` and is priced at the global default.
+`default` in the report's Pricing column (and `[default]` in `models`) means the
+model has no entry in `~/.config/tokmeter/pricing.yaml` and is priced at the global
+default. Pricing keys are matched case-insensitively and ignore a trailing `.gguf`,
+so `Qwen3.6-27B-UD-Q6_K_XL` matches the server-reported `Qwen3.6-27B-UD-Q6_K_XL.gguf`.
 
 ## Pricing
 
