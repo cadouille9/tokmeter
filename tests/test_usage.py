@@ -62,3 +62,27 @@ def test_inject_include_usage_preserves_existing_stream_options():
 
 def test_inject_include_usage_invalid_body_unchanged():
     assert usage.inject_include_usage(b"garbage") == b"garbage"
+
+
+def test_parse_sse_text_collects_usage_from_final_chunk():
+    raw = (
+        'data: {"model":"m","choices":[{"delta":{"content":"Hel"}}]}\n\n'
+        'data: {"model":"m","choices":[{"delta":{"content":"lo"}}]}\n\n'
+        'data: {"model":"m","choices":[],'
+        '"usage":{"prompt_tokens":5,"completion_tokens":2,"total_tokens":7},'
+        '"timings":{"predicted_per_second":30.0}}\n\n'
+        "data: [DONE]\n\n"
+    )
+    parsed = usage.parse_sse_text(raw)
+    assert parsed.model == "m"
+    assert parsed.prompt_tokens == 5
+    assert parsed.completion_tokens == 2
+    assert parsed.total_tokens == 7
+    assert parsed.tokens_per_sec == 30.0
+
+
+def test_parse_sse_text_without_usage_returns_model_only():
+    raw = 'data: {"model":"m","choices":[{"delta":{"content":"hi"}}]}\n\ndata: [DONE]\n\n'
+    parsed = usage.parse_sse_text(raw)
+    assert parsed.model == "m"
+    assert parsed.prompt_tokens is None

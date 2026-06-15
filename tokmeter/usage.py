@@ -68,3 +68,21 @@ def inject_include_usage(body: bytes) -> bytes:
     opts["include_usage"] = True
     obj["stream_options"] = opts
     return json.dumps(obj).encode()
+
+
+def parse_sse_text(raw: str) -> ParsedUsage:
+    parsed = ParsedUsage()
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line.startswith("data:"):
+            continue
+        payload = line[len("data:"):].strip()
+        if not payload or payload == "[DONE]":
+            continue
+        try:
+            obj = json.loads(payload)
+        except ValueError:
+            continue
+        if isinstance(obj, dict):
+            _usage_from_obj(obj, parsed)
+    return parsed
