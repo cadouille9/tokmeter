@@ -76,7 +76,9 @@ def test_compare_totals(tmp_path, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert rc == 0
     assert "Recorded usage" in out
+    assert "1,000,000" in out  # prompt-token total from seed()
     assert "opus" in out
+    assert "$" in out  # a would-have-cost figure was rendered
 
 
 def test_compare_by_model(tmp_path, monkeypatch, capsys):
@@ -90,6 +92,7 @@ def test_compare_by_model(tmp_path, monkeypatch, capsys):
     assert rc == 0
     assert "m1" in out
     assert "opus" in out
+    assert "$" in out  # per-model cost cells were rendered
 
 
 def test_compare_without_references_shows_guidance(tmp_path, monkeypatch, capsys):

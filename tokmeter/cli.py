@@ -74,12 +74,13 @@ def _cmd_models(args) -> int:
 def _cmd_compare(args) -> int:
     conn = db.connect(config.db_path())
     db.init_db(conn)
-    pricing_data = pricing.load_pricing(config.pricing_path())
+    pricing_path = config.pricing_path()
+    pricing_data = pricing.load_pricing(pricing_path)
     references = pricing.reference_rates(pricing_data)
     if not references:
         console.print(
             "No reference models configured. Add a 'references:' section to "
-            f"{config.pricing_path()} (see config/pricing.yaml for an example)."
+            f"{pricing_path} (see config/pricing.yaml for an example)."
         )
         return 0
 
