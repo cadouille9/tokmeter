@@ -67,13 +67,56 @@ def test_reference_rates_empty_when_section_absent():
     assert pricing.reference_rates({"default": {"input_per_1m": 0.1, "output_per_1m": 0.2}}) == []
 
 
-def test_reference_rates_tolerates_non_numeric_price():
-    refs = pricing.reference_rates({"references": {"x": {"input_per_1m": "oops"}}})
-    assert dict(refs)["x"].input_per_1m == 0.0
-    assert dict(refs)["x"].output_per_1m == 0.0
+def test_reference_rates_skips_non_numeric_price_with_warning():
+    # A typo'd price must NOT silently become $0.00 — the reference is dropped
+    # and a warning is surfaced (cost estimates are user-edited financial inputs).
+    p = {"references": {"x": {"input_per_1m": "oops", "output_per_1m": 5.0}}}
+    assert pricing.reference_rates(p) == []
+    warns = pricing.reference_warnings(p)
+    assert len(warns) == 1
+    assert "x" in warns[0]
+    assert "input_per_1m" in warns[0]
 
 
-def test_reference_rates_tolerates_none_spec():
-    refs = pricing.reference_rates({"references": {"x": None}})
+def test_reference_rates_skips_missing_output_price_with_warning():
+    p = {"references": {"x": {"input_per_1m": 5.0}}}
+    assert pricing.reference_rates(p) == []
+    assert "output_per_1m" in pricing.reference_warnings(p)[0]
+
+
+def test_reference_rates_skips_none_spec_with_warning():
+    p = {"references": {"x": None}}
+    assert pricing.reference_rates(p) == []
+    assert pricing.reference_warnings(p)  # at least one warning emitted
+
+
+def test_reference_rates_skips_negative_price():
+    p = {"references": {"x": {"input_per_1m": -1.0, "output_per_1m": 5.0}}}
+    assert pricing.reference_rates(p) == []
+    assert pricing.reference_warnings(p)
+
+
+def test_reference_rates_skips_non_finite_price():
+    p = {"references": {"x": {"input_per_1m": float("inf"), "output_per_1m": 5.0}}}
+    assert pricing.reference_rates(p) == []
+    assert pricing.reference_warnings(p)
+
+
+def test_reference_rates_allows_zero_price():
+    # Zero is a legitimate price (a free model); only missing/invalid/negative drop.
+    p = {"references": {"x": {"input_per_1m": 0.0, "output_per_1m": 0.0}}}
+    refs = pricing.reference_rates(p)
     assert dict(refs)["x"].input_per_1m == 0.0
-    assert dict(refs)["x"].output_per_1m == 0.0
+    assert pricing.reference_warnings(p) == []
+
+
+def test_reference_rates_keeps_valid_skips_invalid_in_mix():
+    p = {
+        "references": {
+            "good": {"input_per_1m": 5.0, "output_per_1m": 25.0},
+            "bad": {"input_per_1m": 5.0, "output_per_1m": "x"},
+        }
+    }
+    assert [name for name, _ in pricing.reference_rates(p)] == ["good"]
+    assert len(pricing.reference_warnings(p)) == 1
+    assert "bad" in pricing.reference_warnings(p)[0]

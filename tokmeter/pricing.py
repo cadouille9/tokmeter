@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -67,28 +68,46 @@ def compute_savings(prompt_tokens: int, completion_tokens: int, rate: Rate) -> f
     return p + c
 
 
-def _to_float(value: object, default: float = 0.0) -> float:
-    # References come from user-supplied YAML; coerce leniently so a typo'd or
-    # missing price falls back to 0.0 instead of crashing `tokmeter compare`.
+def _parse_price(value: object) -> float | None:
+    # A valid price is a finite, non-negative number. Anything else (missing,
+    # non-numeric, negative, inf/nan) is rejected -> None, so callers never
+    # silently substitute 0.0 for a typo and understate cost.
     try:
-        return float(value)  # type: ignore[arg-type]
+        f = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
-        return default
+        return None
+    if not math.isfinite(f) or f < 0:
+        return None
+    return f
+
+
+def _parse_references(pricing: dict) -> tuple[list[tuple[str, Rate]], list[str]]:
+    refs = pricing.get("references") or {}
+    valid: list[tuple[str, Rate]] = []
+    warnings: list[str] = []
+    for name, spec in refs.items():
+        spec = spec or {}
+        in_rate = _parse_price(spec.get("input_per_1m"))
+        out_rate = _parse_price(spec.get("output_per_1m"))
+        bad = [
+            field
+            for field, parsed in (("input_per_1m", in_rate), ("output_per_1m", out_rate))
+            if parsed is None
+        ]
+        if bad:
+            warnings.append(
+                f"reference {name!r} skipped: missing or invalid "
+                + " and ".join(bad)
+                + " (each price must be a number >= 0)"
+            )
+            continue
+        valid.append((name, Rate(input_per_1m=in_rate, output_per_1m=out_rate, mapped=True)))
+    return valid, warnings
 
 
 def reference_rates(pricing: dict) -> list[tuple[str, Rate]]:
-    refs = pricing.get("references") or {}
-    out: list[tuple[str, Rate]] = []
-    for name, spec in refs.items():
-        spec = spec or {}
-        out.append(
-            (
-                name,
-                Rate(
-                    input_per_1m=_to_float(spec.get("input_per_1m")),
-                    output_per_1m=_to_float(spec.get("output_per_1m")),
-                    mapped=True,
-                ),
-            )
-        )
-    return out
+    return _parse_references(pricing)[0]
+
+
+def reference_warnings(pricing: dict) -> list[str]:
+    return _parse_references(pricing)[1]

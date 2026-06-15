@@ -95,6 +95,34 @@ def test_compare_by_model(tmp_path, monkeypatch, capsys):
     assert "$" in out  # per-model cost cells were rendered
 
 
+def seed_pricing_with_bad_reference(tmp_path):
+    p = tmp_path / "pricing.yaml"
+    p.write_text(
+        "references:\n"
+        "  opus:\n"
+        "    input_per_1m: 10.0\n"
+        "    output_per_1m: 20.0\n"
+        "  broken:\n"
+        "    input_per_1m: oops\n"
+        "    output_per_1m: 5.0\n"
+    )
+    return p
+
+
+def test_compare_warns_on_invalid_reference_and_keeps_valid(tmp_path, monkeypatch, capsys):
+    path = seed(tmp_path)
+    pp = seed_pricing_with_bad_reference(tmp_path)
+    monkeypatch.setattr(cli.config, "db_path", lambda: path)
+    monkeypatch.setattr(cli.config, "pricing_path", lambda: pp)
+
+    rc = cli.main(["compare"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "warning" in out.lower()  # the invalid reference is surfaced, not silent
+    assert "broken" in out
+    assert "opus" in out  # the valid reference is still shown
+
+
 def test_compare_without_references_shows_guidance(tmp_path, monkeypatch, capsys):
     path = seed(tmp_path)
     monkeypatch.setattr(cli.config, "db_path", lambda: path)

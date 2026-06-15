@@ -58,6 +58,11 @@ The shipped reference prices are **example placeholders** — edit
 `~/.config/tokmeter/pricing.yaml` with current figures from
 https://www.anthropic.com/pricing (and add other providers as needed).
 
+A reference is only used if both `input_per_1m` and `output_per_1m` are present and
+are numbers `>= 0`. An invalid or missing price does **not** silently become `$0.00`:
+that reference is skipped and `compare` prints a warning naming it, so a typo can't
+quietly understate your costs.
+
 ## Pricing
 
 Copy the example and edit cloud-equivalent prices (USD per 1M tokens):

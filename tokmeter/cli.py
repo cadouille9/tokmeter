@@ -76,6 +76,8 @@ def _cmd_compare(args) -> int:
     db.init_db(conn)
     pricing_path = config.pricing_path()
     pricing_data = pricing.load_pricing(pricing_path)
+    for warning in pricing.reference_warnings(pricing_data):
+        console.print(f"[yellow]warning:[/] {warning}")
     references = pricing.reference_rates(pricing_data)
     if not references:
         console.print(
