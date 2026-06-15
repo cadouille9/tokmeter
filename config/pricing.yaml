@@ -13,3 +13,17 @@ models:
     input_per_1m: 0.15
     output_per_1m: 0.60
     comparable: gpt-4o-mini   # free-form note for yourself
+
+# Cloud reference models for `tokmeter compare`. USD per 1M tokens.
+# EXAMPLE PLACEHOLDER PRICES — replace with current values from
+# https://www.anthropic.com/pricing (or add OpenAI/Gemini/etc. the same way).
+references:
+  claude-opus-4-8:
+    input_per_1m: 5.00
+    output_per_1m: 25.00
+  claude-sonnet-4-6:
+    input_per_1m: 3.00
+    output_per_1m: 15.00
+  claude-haiku-4-5:
+    input_per_1m: 1.00
+    output_per_1m: 5.00

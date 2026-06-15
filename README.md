@@ -44,6 +44,20 @@ model has no entry in `~/.config/tokmeter/pricing.yaml` and is priced at the glo
 default. Pricing keys are matched case-insensitively and ignore a trailing `.gguf`,
 so `Qwen3.6-27B-UD-Q6_K_XL` matches the server-reported `Qwen3.6-27B-UD-Q6_K_XL.gguf`.
 
+## Compare against cloud models
+
+Estimate what your recorded local usage would have cost on cloud models (i.e. your
+savings vs each), using the `references:` section of `pricing.yaml`:
+
+    .venv/bin/tokmeter compare                      # totals: one row per reference
+    .venv/bin/tokmeter compare --since 2026-06-01   # same filters as report
+    .venv/bin/tokmeter compare --model Qwen3.6-27B-UD-Q6_K_XL.gguf
+    .venv/bin/tokmeter compare --by-model           # matrix: local models x references
+
+The shipped reference prices are **example placeholders** — edit
+`~/.config/tokmeter/pricing.yaml` with current figures from
+https://www.anthropic.com/pricing (and add other providers as needed).
+
 ## Pricing
 
 Copy the example and edit cloud-equivalent prices (USD per 1M tokens):
