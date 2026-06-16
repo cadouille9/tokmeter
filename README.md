@@ -3,6 +3,63 @@
 Transparent local proxy that logs LLM token usage per model to SQLite, with
 cost-savings reports. Sits in front of any OpenAI-compatible server (llama.cpp, ollama).
 
+## Architecture
+
+tokmeter has two halves that meet at a shared SQLite database: a **live proxy**
+that sits in your request path and records token usage, and an **offline CLI**
+that reads that database to print reports.
+
+```mermaid
+flowchart TB
+    client["LLM client<br/>(OPENAI_BASE_URL → :8079/v1)"]
+
+    subgraph serve["tokmeter serve — logging proxy (Starlette/uvicorn)"]
+        direction TB
+        handler["handler<br/>(proxy.py)<br/>forwards every request verbatim"]
+        usage["usage.py<br/>classify endpoint · detect stream ·<br/>inject stream_options.include_usage ·<br/>parse usage from JSON / SSE"]
+        writer["UsageWriter<br/>(writer.py)<br/>background thread + queue<br/>— never blocks the response"]
+        handler -.-> usage
+        handler --> writer
+    end
+
+    upstream["Upstream LLM server<br/>llama.cpp / ollama<br/>(:8080, OpenAI-compatible)"]
+    db[("SQLite<br/>~/.local/share/tokmeter/usage.db<br/>requests table")]
+    pricing["pricing.yaml<br/>~/.config/tokmeter/<br/>defaults · models · references"]
+
+    subgraph cli["tokmeter report / models / compare — CLI (offline)"]
+        direction TB
+        dbmod["db.py<br/>aggregate by model / day"]
+        reportmod["report.py + pricing.py<br/>resolve rates · savings ·<br/>cloud comparison · Rich tables / CSV"]
+        dbmod --> reportmod
+    end
+
+    terminal["Terminal tables / CSV"]
+
+    client -->|"HTTP request"| handler
+    handler -->|"proxied request"| upstream
+    upstream -->|"response (JSON or SSE)"| handler
+    handler -->|"response returned unchanged"| client
+    writer -->|"INSERT UsageRecord"| db
+
+    db --> dbmod
+    pricing --> reportmod
+    reportmod --> terminal
+```
+
+**Live path (top):** a client points its `OPENAI_BASE_URL` at the proxy on
+`:8079` instead of the backend on `:8080`. The proxy forwards every request and
+returns every response unchanged, so it's transparent to the client. For tracked
+endpoints (`chat/completions`, `completions`, `embeddings`) it parses the token
+usage out of the response — injecting `stream_options.include_usage=true` on
+streaming requests so the backend emits a final usage chunk — and hands a
+`UsageRecord` to a background writer thread that persists it to SQLite. Capture is
+best-effort: a parse error or a down database never breaks the proxied response.
+
+**Reporting path (bottom):** the `report`, `models`, and `compare` commands read
+the SQLite database directly (the proxy doesn't need to be running), aggregate
+usage by model or day, apply rates from `pricing.yaml` to estimate
+cloud-equivalent cost / savings, and render Rich tables (or CSV).
+
 ## Install
 
     python -m venv .venv
