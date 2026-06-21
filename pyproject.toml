@@ -6,7 +6,17 @@ build-backend = "hatchling.build"
 name = "tokmeter"
 version = "0.1.0"
 description = "Local LLM usage tracker: transparent proxy that logs token usage per model."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Christopher Douillet" }]
 requires-python = ">=3.11"
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Environment :: Console",
+    "Topic :: Utilities",
+]
 dependencies = [
     "starlette>=0.37",
     "uvicorn>=0.30",
@@ -14,6 +24,11 @@ dependencies = [
     "PyYAML>=6.0",
     "rich>=13.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/cadouille9/tokmeter"
+Repository = "https://github.com/cadouille9/tokmeter"
+Issues = "https://github.com/cadouille9/tokmeter/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]

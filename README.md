@@ -126,3 +126,12 @@ Copy the example and edit cloud-equivalent prices (USD per 1M tokens):
 
     mkdir -p ~/.config/tokmeter
     cp config/pricing.yaml ~/.config/tokmeter/pricing.yaml
+
+## Development
+
+    .venv/bin/pip install -e ".[dev]"
+    .venv/bin/pytest
+
+## License
+
+[MIT](LICENSE) © Christopher Douillet
