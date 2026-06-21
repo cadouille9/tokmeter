@@ -1,7 +1,19 @@
 # tokmeter
 
-Transparent local proxy that logs LLM token usage per model to SQLite, with
-cost-savings reports. Sits in front of any OpenAI-compatible server (llama.cpp, ollama).
+**Ever had to justify to your partner why you spent four figures on GPUs?**
+Here's your tool.
+
+tokmeter is a transparent local proxy that logs LLM token usage per model to
+SQLite and turns it into cost-savings reports. Point your clients at it, keep
+running your local models as usual, and it quietly tallies every token you
+*didn't* rent from the cloud — so the next time the hardware budget comes up at
+dinner, you have receipts:
+
+    .venv/bin/tokmeter compare
+    # → Running locally has "saved" you $1,420 vs Claude Opus. You're welcome.
+
+Sits in front of any OpenAI-compatible server (llama.cpp, ollama). Marital
+outcomes not guaranteed.
 
 ## Architecture
 
@@ -103,8 +115,9 @@ so `Qwen3.6-27B-UD-Q6_K_XL` matches the server-reported `Qwen3.6-27B-UD-Q6_K_XL.
 
 ## Compare against cloud models
 
-Estimate what your recorded local usage would have cost on cloud models (i.e. your
-savings vs each), using the `references:` section of `pricing.yaml`:
+The main event. Estimate what your recorded local usage *would* have cost on cloud
+models (i.e. your savings vs each) — the number you quote at dinner — using the
+`references:` section of `pricing.yaml`:
 
     .venv/bin/tokmeter compare                      # totals: one row per reference
     .venv/bin/tokmeter compare --since 2026-06-01   # same filters as report
