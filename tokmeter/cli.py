@@ -56,11 +56,12 @@ def _cmd_report(args) -> int:
         f"[bold]Totals:[/] {t['requests']} requests, "
         f"{t['total_tokens']:,} tokens, ~${t['saved_usd']:.2f} saved"
     )
-    energy_rows = db.rows_for_energy(conn, since=args.since, until=args.until, model=args.model)
-    summary, warnings = report.energy_summary(pricing_data, energy_rows)
+    elec, warnings = pricing.electricity_config(pricing_data)
     for warning in warnings:
         console.print(f"[yellow]warning:[/] {warning}")
-    if summary is not None:
+    if elec is not None:
+        energy_rows = db.rows_for_energy(conn, since=args.since, until=args.until, model=args.model)
+        summary, _ = report.energy_summary(pricing_data, energy_rows)
         for line in report.energy_lines(summary, gross_saved_usd=t["saved_usd"]):
             console.print(line)
     return 0
@@ -111,11 +112,12 @@ def _cmd_compare(args) -> int:
     )
     rows = report.build_comparison(prompt_tokens, completion_tokens, references)
     console.print(report.render_comparison_table(rows))
-    energy_rows = db.rows_for_energy(conn, since=args.since, until=args.until, model=args.model)
-    summary, warnings = report.energy_summary(pricing_data, energy_rows)
+    elec, warnings = pricing.electricity_config(pricing_data)
     for warning in warnings:
         console.print(f"[yellow]warning:[/] {warning}")
-    if summary is not None:
+    if elec is not None:
+        energy_rows = db.rows_for_energy(conn, since=args.since, until=args.until, model=args.model)
+        summary, _ = report.energy_summary(pricing_data, energy_rows)
         for line in report.energy_lines(summary, gross_saved_usd=None):
             console.print(line)
         if summary["cost_usd"] is not None:

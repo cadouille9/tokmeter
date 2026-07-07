@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv as _csv
 from pathlib import Path
 
+from rich.markup import escape
 from rich.table import Table
 
 from . import pricing as pricing_mod
@@ -163,7 +164,7 @@ def energy_lines(summary: dict, gross_saved_usd: float | None) -> list[str]:
     lines = [
         f"[bold]Energy:[/] {summary['active_hours']:.1f} h active · {summary['kwh']:.2f} kWh"
     ]
-    cost_line = f"[bold]Electricity:[/] {summary['currency']} {summary['cost']:.2f}"
+    cost_line = f"[bold]Electricity:[/] {escape(str(summary['currency']))} {summary['cost']:.2f}"
     if summary["cost_usd"] is not None:
         cost_line += f" (≈ ${summary['cost_usd']:.2f})"
         lines.append(cost_line)

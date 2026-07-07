@@ -52,3 +52,21 @@ def test_energy_lines_without_usd_rate_omits_net():
     text = "\n".join(lines)
     assert "usd_per_unit" in text  # hint how to enable netting
     assert "$9.00" not in text
+
+
+def test_energy_lines_escapes_markup_in_currency():
+    from rich.console import Console
+    import io
+
+    pricing = {k: dict(v) if isinstance(v, dict) else v for k, v in PRICING.items()}
+    pricing["electricity"] = dict(PRICING["electricity"])
+    pricing["electricity"]["currency"] = "[/]"
+    summary, warnings = report.energy_summary(pricing, ROWS)
+    assert warnings == []
+    lines = report.energy_lines(summary, gross_saved_usd=10.0)
+    text = "\n".join(lines)
+    assert "[/]" in text
+
+    console = Console(file=io.StringIO(), force_terminal=False)
+    for line in lines:
+        console.print(line)  # must not raise MarkupError
