@@ -115,3 +115,14 @@ def distinct_models(conn) -> list[str]:
         "SELECT DISTINCT model FROM requests WHERE model IS NOT NULL"
     ).fetchall()
     return [r["model"] for r in rows]
+
+
+def rows_for_energy(conn, since=None, until=None, model=None) -> list[tuple]:
+    where, params = _where(since, until, model)
+    prefix = " AND " if where else " WHERE "
+    rows = conn.execute(
+        f"SELECT model, ts, duration_ms FROM requests{where}{prefix}"
+        "duration_ms IS NOT NULL AND duration_ms > 0",
+        params,
+    ).fetchall()
+    return [(r["model"], r["ts"], r["duration_ms"]) for r in rows]

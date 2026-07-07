@@ -1,4 +1,4 @@
-from tokmeter import energy
+from tokmeter import db, energy
 
 
 def test_merged_seconds_disjoint():
@@ -46,3 +46,29 @@ def test_energy_kwh_merges_within_model_adds_across_models():
     hours, kwh = energy.energy_kwh(rows, watts_for=lambda m: {"a": 100, "b": 300}[m])
     assert hours == 2.0  # per-model active hours summed
     assert abs(kwh - 0.4) < 1e-9
+
+
+def _record(ts, model="m", duration_ms=1000):
+    return db.UsageRecord(
+        ts=ts, model=model, endpoint="chat/completions",
+        prompt_tokens=1, completion_tokens=1, total_tokens=2,
+        duration_ms=duration_ms, tokens_per_sec=1.0, stream=0, status=200,
+        upstream="http://x",
+    )
+
+
+def test_rows_for_energy_filters_and_shape(tmp_path):
+    conn = db.connect(tmp_path / "usage.db")
+    db.init_db(conn)
+    db.insert_record(conn, _record("2026-07-06T10:00:01+00:00"))
+    db.insert_record(conn, _record("2026-07-07T10:00:02+00:00"))
+    db.insert_record(conn, _record("2026-07-07T10:00:03+00:00", duration_ms=0))
+    db.insert_record(conn, _record("2026-07-07T10:00:04+00:00", model="other"))
+
+    rows = db.rows_for_energy(conn, since="2026-07-07")
+    assert ("m", "2026-07-07T10:00:02+00:00", 1000) in rows
+    assert ("other", "2026-07-07T10:00:04+00:00", 1000) in rows
+    assert len(rows) == 2  # zero-duration and pre-since rows excluded
+
+    rows_m = db.rows_for_energy(conn, model="m")
+    assert {r[0] for r in rows_m} == {"m"}
