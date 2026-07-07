@@ -135,3 +135,45 @@ def build_comparison(prompt_tokens: int, completion_tokens: int, references: lis
         )
     rows.sort(key=lambda r: r["would_cost"], reverse=True)
     return rows
+
+
+def energy_summary(pricing: dict, rows) -> tuple[dict | None, list[str]]:
+    from . import energy as energy_mod
+
+    elec, warnings = pricing_mod.electricity_config(pricing)
+    if elec is None:
+        return None, warnings
+    hours, kwh = energy_mod.energy_kwh(
+        rows, watts_for=lambda m: pricing_mod.resolve_watts(pricing, elec, m)
+    )
+    cost = kwh * elec.price_per_kwh
+    return (
+        {
+            "active_hours": hours,
+            "kwh": kwh,
+            "cost": cost,
+            "currency": elec.currency,
+            "cost_usd": cost * elec.usd_per_unit if elec.usd_per_unit is not None else None,
+        },
+        warnings,
+    )
+
+
+def energy_lines(summary: dict, gross_saved_usd: float | None) -> list[str]:
+    lines = [
+        f"[bold]Energy:[/] {summary['active_hours']:.1f} h active · {summary['kwh']:.2f} kWh"
+    ]
+    cost_line = f"[bold]Electricity:[/] {summary['currency']} {summary['cost']:.2f}"
+    if summary["cost_usd"] is not None:
+        cost_line += f" (≈ ${summary['cost_usd']:.2f})"
+        lines.append(cost_line)
+        if gross_saved_usd is not None:
+            net = gross_saved_usd - summary["cost_usd"]
+            lines.append(
+                f"[bold]Net saved:[/] ${gross_saved_usd:.2f} gross − "
+                f"${summary['cost_usd']:.2f} electricity = ${net:.2f}"
+            )
+    else:
+        cost_line += " (set electricity.usd_per_unit to see net savings)"
+        lines.append(cost_line)
+    return lines
