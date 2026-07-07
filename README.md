@@ -140,6 +140,30 @@ Copy the example and edit cloud-equivalent prices (USD per 1M tokens):
     mkdir -p ~/.config/tokmeter
     cp config/pricing.yaml ~/.config/tokmeter/pricing.yaml
 
+## Electricity cost (net savings)
+
+Add an optional `electricity:` block to `pricing.yaml` and reports subtract power
+cost from the cloud-equivalent savings:
+
+```yaml
+electricity:
+  price_per_kwh: 0.277   # your tariff (ElCom 2026 Swiss household average shown)
+  currency: CHF
+  usd_per_unit: 1.25     # FX for the net-savings line; omit to skip netting
+  default_watts: 250
+
+models:
+  gemma-4-31b: { watts: 210 }   # per-model override: box draw for that model's GPU config
+```
+
+How it's estimated: requests are turned into time intervals (`ts` is the request end,
+spanning `duration_ms` backwards), overlapping intervals of the same model are merged
+(parallel slots aren't double-billed), and each model's active hours × watts gives kWh.
+Different models add up — if two models run concurrently they're assumed to be on
+different GPUs, both drawing power. Idle draw (model loaded, nothing generating) is not
+counted, and `watts` values are your estimates — calibrate with a wall-plug meter for
+precision. Reports re-price history retroactively whenever you edit the config.
+
 ## Development
 
     .venv/bin/pip install -e ".[dev]"

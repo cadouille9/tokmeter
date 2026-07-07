@@ -13,6 +13,7 @@ models:
     input_per_1m: 0.15
     output_per_1m: 0.60
     comparable: gpt-4o-mini   # free-form note for yourself
+    # watts: 210               # optional: per-model power draw, see `electricity:` below
 
 # Cloud reference models for `tokmeter compare`. USD per 1M tokens.
 # EXAMPLE PLACEHOLDER PRICES — replace with current values from
@@ -27,3 +28,11 @@ references:
   claude-haiku-4-5:
     input_per_1m: 1.00
     output_per_1m: 5.00
+
+# Optional: electricity cost accounting. When present, reports/compare add
+# Energy/Electricity columns and net local savings against power cost.
+# electricity:
+#   price_per_kwh: 0.277   # your tariff (ElCom 2026 Swiss household average shown)
+#   currency: CHF
+#   usd_per_unit: 1.25     # FX for the net-savings line; omit to skip netting
+#   default_watts: 250
