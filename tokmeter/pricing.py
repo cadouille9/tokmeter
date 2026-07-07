@@ -111,3 +111,61 @@ def reference_rates(pricing: dict) -> list[tuple[str, Rate]]:
 
 def reference_warnings(pricing: dict) -> list[str]:
     return _parse_references(pricing)[1]
+
+
+@dataclass(frozen=True)
+class ElectricityConfig:
+    price_per_kwh: float
+    currency: str
+    usd_per_unit: float | None
+    default_watts: float
+
+
+def electricity_config(pricing: dict) -> tuple[ElectricityConfig | None, list[str]]:
+    block = pricing.get("electricity")
+    if not block:
+        return None, []
+    price = _parse_price(block.get("price_per_kwh"))
+    watts = _parse_price(block.get("default_watts", 250))
+    usd = block.get("usd_per_unit")
+    usd_parsed = _parse_price(usd) if usd is not None else None
+    problems = []
+    if price is None:
+        problems.append("price_per_kwh")
+    if watts is None:
+        problems.append("default_watts")
+    if usd is not None and usd_parsed is None:
+        problems.append("usd_per_unit")
+    if problems:
+        return None, [
+            "electricity block ignored: invalid " + " and ".join(problems)
+            + " (each must be a number >= 0)"
+        ]
+    return (
+        ElectricityConfig(
+            price_per_kwh=price,
+            currency=str(block.get("currency", "CHF")),
+            usd_per_unit=usd_parsed,
+            default_watts=watts,
+        ),
+        [],
+    )
+
+
+def resolve_watts(pricing: dict, elec: ElectricityConfig, model: str | None) -> float:
+    models = pricing.get("models", {})
+    entry = None
+    if model:
+        if model in models:
+            entry = models[model]
+        else:
+            target = _normalize(model)
+            for key, val in models.items():
+                if _normalize(key) == target:
+                    entry = val
+                    break
+    if entry:
+        w = _parse_price(entry.get("watts"))
+        if w is not None:
+            return w
+    return elec.default_watts
