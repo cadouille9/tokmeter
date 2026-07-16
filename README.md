@@ -83,6 +83,15 @@ cloud-equivalent cost / savings, and render Rich tables (or CSV).
 
 Override with env vars: `TOKMETER_PORT`, `TOKMETER_UPSTREAM`, `TOKMETER_HOST`.
 
+To front several backends at once, set `TOKMETER_LISTENERS` to comma-separated
+`PORT=UPSTREAM_URL` pairs (it takes precedence over `TOKMETER_PORT`/`TOKMETER_UPSTREAM`):
+
+    TOKMETER_LISTENERS=8079=http://127.0.0.1:8080,8000=http://127.0.0.1:8010 \
+        .venv/bin/tokmeter serve
+
+Each listener proxies to its own upstream; all requests land in the same
+database, distinguished by the `upstream` column.
+
 ### Point your clients at the proxy
 
 Change your client base URL from the backend port to the proxy:

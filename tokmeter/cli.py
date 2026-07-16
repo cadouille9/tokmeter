@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
+import signal
 import sys
+from contextlib import contextmanager
 
 from rich.console import Console
 
@@ -10,22 +13,59 @@ from . import config, db, pricing, report
 console = Console()
 
 
-def _cmd_serve(args) -> int:
+def _build_servers(settings: config.Settings, writer) -> list:
     import uvicorn
 
     from .proxy import create_app
+
+    class _Server(uvicorn.Server):
+        # Signals are handled centrally in _serve_until_signal. Uvicorn's own
+        # capture uses signal.signal per server, so with several servers only
+        # the last-registered one would ever see SIGINT/SIGTERM.
+        @contextmanager
+        def capture_signals(self):
+            yield
+
+    servers = []
+    for listener in settings.listeners:
+        app = create_app(upstream=listener.upstream, writer=writer)
+        cfg = uvicorn.Config(
+            app, host=settings.listen_host, port=listener.port, log_level="warning"
+        )
+        servers.append(_Server(cfg))
+    return servers
+
+
+async def _serve_until_signal(servers) -> None:
+    loop = asyncio.get_running_loop()
+
+    def request_exit() -> None:
+        for server in servers:
+            server.should_exit = True
+
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, request_exit)
+    try:
+        await asyncio.gather(*(server.serve() for server in servers))
+    finally:
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.remove_signal_handler(sig)
+
+
+def _cmd_serve(args) -> int:
     from .writer import UsageWriter
 
     settings = config.load_settings()
     writer = UsageWriter(config.db_path())
     writer.start()
-    app = create_app(upstream=settings.upstream, writer=writer)
-    console.print(
-        f"[bold green]tokmeter[/] proxying "
-        f"http://{settings.listen_host}:{settings.listen_port} -> {settings.upstream}"
-    )
+    servers = _build_servers(settings, writer)
+    for listener in settings.listeners:
+        console.print(
+            f"[bold green]tokmeter[/] proxying "
+            f"http://{settings.listen_host}:{listener.port} -> {listener.upstream}"
+        )
     try:
-        uvicorn.run(app, host=settings.listen_host, port=settings.listen_port, log_level="warning")
+        asyncio.run(_serve_until_signal(servers))
     finally:
         writer.stop()
     return 0

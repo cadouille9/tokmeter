@@ -1,4 +1,19 @@
-from tokmeter import cli, db
+from tokmeter import cli, config, db
+
+
+def test_build_servers_one_per_listener():
+    settings = config.Settings(
+        listen_host="127.0.0.1",
+        listeners=(
+            config.Listener(port=8079, upstream="http://127.0.0.1:8080"),
+            config.Listener(port=8000, upstream="http://127.0.0.1:8010"),
+        ),
+    )
+    servers = cli._build_servers(settings, writer=None)
+    assert [s.config.port for s in servers] == [8079, 8000]
+    # Uvicorn's per-server signal capture must be neutralized (handled centrally).
+    with servers[0].capture_signals():
+        pass
 
 
 def seed(tmp_path):

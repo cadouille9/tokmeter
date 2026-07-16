@@ -1,23 +1,63 @@
 from pathlib import Path
 
+import pytest
+
 from tokmeter import config
 
 
 def test_defaults(monkeypatch):
+    monkeypatch.delenv("TOKMETER_LISTENERS", raising=False)
     monkeypatch.delenv("TOKMETER_PORT", raising=False)
     monkeypatch.delenv("TOKMETER_UPSTREAM", raising=False)
     s = config.load_settings()
     assert s.listen_host == "127.0.0.1"
-    assert s.listen_port == 8079
-    assert s.upstream == "http://127.0.0.1:8080"
+    assert s.listeners == (config.Listener(port=8079, upstream="http://127.0.0.1:8080"),)
 
 
-def test_env_overrides(monkeypatch):
+def test_legacy_env_overrides(monkeypatch):
+    monkeypatch.delenv("TOKMETER_LISTENERS", raising=False)
     monkeypatch.setenv("TOKMETER_PORT", "9000")
     monkeypatch.setenv("TOKMETER_UPSTREAM", "http://127.0.0.1:8081")
     s = config.load_settings()
-    assert s.listen_port == 9000
-    assert s.upstream == "http://127.0.0.1:8081"
+    assert s.listeners == (config.Listener(port=9000, upstream="http://127.0.0.1:8081"),)
+
+
+def test_listeners_multi(monkeypatch):
+    monkeypatch.setenv(
+        "TOKMETER_LISTENERS",
+        "8079=http://127.0.0.1:8080, 8000=http://127.0.0.1:8010 ,8082=http://127.0.0.1:8081",
+    )
+    s = config.load_settings()
+    assert s.listeners == (
+        config.Listener(port=8079, upstream="http://127.0.0.1:8080"),
+        config.Listener(port=8000, upstream="http://127.0.0.1:8010"),
+        config.Listener(port=8082, upstream="http://127.0.0.1:8081"),
+    )
+
+
+def test_listeners_wins_over_legacy_vars(monkeypatch):
+    monkeypatch.setenv("TOKMETER_LISTENERS", "9001=http://127.0.0.1:9000")
+    monkeypatch.setenv("TOKMETER_PORT", "8079")
+    monkeypatch.setenv("TOKMETER_UPSTREAM", "http://127.0.0.1:8080")
+    s = config.load_settings()
+    assert s.listeners == (config.Listener(port=9001, upstream="http://127.0.0.1:9000"),)
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "8079",  # no upstream
+        "8079=",  # empty upstream
+        "eighty=http://127.0.0.1:8080",  # non-numeric port
+        "8079=http://a,8079=http://b",  # duplicate port
+        "",  # set but empty
+        " , ,",  # only separators
+    ],
+)
+def test_listeners_malformed_rejected(monkeypatch, raw):
+    monkeypatch.setenv("TOKMETER_LISTENERS", raw)
+    with pytest.raises(ValueError):
+        config.load_settings()
 
 
 def test_paths_under_xdg(monkeypatch, tmp_path):
