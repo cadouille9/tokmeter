@@ -16,6 +16,21 @@ def test_build_servers_one_per_listener():
         pass
 
 
+def test_build_servers_per_listener_host_with_fallback():
+    settings = config.Settings(
+        listen_host="127.0.0.1",
+        listeners=(
+            config.Listener(port=8079, upstream="http://127.0.0.1:8080"),
+            config.Listener(port=8000, upstream="http://127.0.0.1:8010", host="192.168.1.252"),
+        ),
+    )
+    servers = cli._build_servers(settings, writer=None)
+    assert [(s.config.host, s.config.port) for s in servers] == [
+        ("127.0.0.1", 8079),
+        ("192.168.1.252", 8000),
+    ]
+
+
 def seed(tmp_path):
     path = tmp_path / "usage.db"
     conn = db.connect(path)

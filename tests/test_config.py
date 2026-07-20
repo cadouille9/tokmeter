@@ -60,6 +60,40 @@ def test_listeners_malformed_rejected(monkeypatch, raw):
         config.load_settings()
 
 
+def test_listener_host_prefix(monkeypatch):
+    monkeypatch.setenv("TOKMETER_LISTENERS", "192.168.1.252:8000=http://127.0.0.1:8010")
+    s = config.load_settings()
+    assert s.listeners == (
+        config.Listener(host="192.168.1.252", port=8000, upstream="http://127.0.0.1:8010"),
+    )
+
+
+def test_listener_same_port_different_hosts_allowed(monkeypatch):
+    monkeypatch.setenv(
+        "TOKMETER_LISTENERS",
+        "8000=http://127.0.0.1:8010,192.168.1.252:8000=http://127.0.0.1:8010",
+    )
+    s = config.load_settings()
+    assert s.listeners == (
+        config.Listener(port=8000, upstream="http://127.0.0.1:8010"),
+        config.Listener(host="192.168.1.252", port=8000, upstream="http://127.0.0.1:8010"),
+    )
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "10.0.0.1:8000=http://a,10.0.0.1:8000=http://b",  # duplicate host:port
+        ":8000=http://a",  # empty host
+        "10.0.0.1:eighty=http://a",  # non-numeric port with host
+    ],
+)
+def test_listener_host_prefix_malformed_rejected(monkeypatch, raw):
+    monkeypatch.setenv("TOKMETER_LISTENERS", raw)
+    with pytest.raises(ValueError):
+        config.load_settings()
+
+
 def test_paths_under_xdg(monkeypatch, tmp_path):
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))

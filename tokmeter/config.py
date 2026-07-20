@@ -7,6 +7,7 @@ from pathlib import Path
 class Listener:
     port: int
     upstream: str
+    host: str | None = None  # None -> bind Settings.listen_host
 
 
 @dataclass(frozen=True)
@@ -17,28 +18,38 @@ class Settings:
 
 def _parse_listeners(raw: str) -> tuple[Listener, ...]:
     listeners: list[Listener] = []
-    seen_ports: set[int] = set()
+    seen: set[tuple[str | None, int]] = set()
     for item in raw.split(","):
         item = item.strip()
         if not item:
             continue
-        port_str, sep, upstream = item.partition("=")
+        left, sep, upstream = item.partition("=")
         if not sep or not upstream.strip():
             raise ValueError(
-                f"TOKMETER_LISTENERS entry {item!r} must look like PORT=UPSTREAM_URL"
+                f"TOKMETER_LISTENERS entry {item!r} must look like [HOST:]PORT=UPSTREAM_URL"
             )
+        left = left.strip()
+        host: str | None = None
+        port_str = left
+        if ":" in left:
+            host, _, port_str = left.rpartition(":")
+            host = host.strip()
+            if not host:
+                raise ValueError(f"TOKMETER_LISTENERS entry {item!r} has an empty host")
         try:
             port = int(port_str.strip())
         except ValueError:
             raise ValueError(
                 f"TOKMETER_LISTENERS entry {item!r} has a non-numeric port"
             ) from None
-        if port in seen_ports:
-            raise ValueError(f"TOKMETER_LISTENERS lists port {port} more than once")
-        seen_ports.add(port)
-        listeners.append(Listener(port=port, upstream=upstream.strip()))
+        if (host, port) in seen:
+            raise ValueError(f"TOKMETER_LISTENERS lists {left} more than once")
+        seen.add((host, port))
+        listeners.append(Listener(host=host, port=port, upstream=upstream.strip()))
     if not listeners:
-        raise ValueError("TOKMETER_LISTENERS is set but contains no PORT=UPSTREAM_URL entries")
+        raise ValueError(
+            "TOKMETER_LISTENERS is set but contains no [HOST:]PORT=UPSTREAM_URL entries"
+        )
     return tuple(listeners)
 
 

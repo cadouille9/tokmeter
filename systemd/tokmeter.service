@@ -7,8 +7,10 @@ Type=simple
 ExecStart=%h/dev/tokmeter/.venv/bin/tokmeter serve
 Environment=TOKMETER_PORT=8079
 Environment=TOKMETER_UPSTREAM=http://127.0.0.1:8080
-# Multiple backends: replace the two lines above with PORT=UPSTREAM pairs, e.g.
-# Environment=TOKMETER_LISTENERS=8079=http://127.0.0.1:8080,8000=http://127.0.0.1:8010
+# Multiple backends: replace the two lines above with [HOST:]PORT=UPSTREAM pairs.
+# HOST is optional (default TOKMETER_HOST / 127.0.0.1); prefix it to add e.g. a
+# LAN-IP listener alongside the loopback ones:
+# Environment=TOKMETER_LISTENERS=8079=http://127.0.0.1:8080,192.168.1.50:8000=http://127.0.0.1:8010
 Restart=on-failure
 RestartSec=2
 

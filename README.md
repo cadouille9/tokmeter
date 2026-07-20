@@ -84,11 +84,16 @@ cloud-equivalent cost / savings, and render Rich tables (or CSV).
 Override with env vars: `TOKMETER_PORT`, `TOKMETER_UPSTREAM`, `TOKMETER_HOST`.
 
 To front several backends at once, set `TOKMETER_LISTENERS` to comma-separated
-`PORT=UPSTREAM_URL` pairs (it takes precedence over `TOKMETER_PORT`/`TOKMETER_UPSTREAM`):
+`[HOST:]PORT=UPSTREAM_URL` entries (it takes precedence over
+`TOKMETER_PORT`/`TOKMETER_UPSTREAM`). `HOST` is optional and defaults to
+`TOKMETER_HOST` (`127.0.0.1`); the same port may be bound on several hosts:
 
-    TOKMETER_LISTENERS=8079=http://127.0.0.1:8080,8000=http://127.0.0.1:8010 \
+    TOKMETER_LISTENERS=8079=http://127.0.0.1:8080,8000=http://127.0.0.1:8010,192.168.1.252:8000=http://127.0.0.1:8010 \
         .venv/bin/tokmeter serve
 
+A `HOST:` prefix lets you add e.g. a LAN-IP listener for remote clients while
+keeping the loopback ones — binding `0.0.0.0` instead can collide with other
+services that hold the same port on a specific address (e.g. `tailscale serve`).
 Each listener proxies to its own upstream; all requests land in the same
 database, distinguished by the `upstream` column.
 

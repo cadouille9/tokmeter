@@ -30,7 +30,10 @@ def _build_servers(settings: config.Settings, writer) -> list:
     for listener in settings.listeners:
         app = create_app(upstream=listener.upstream, writer=writer)
         cfg = uvicorn.Config(
-            app, host=settings.listen_host, port=listener.port, log_level="warning"
+            app,
+            host=listener.host or settings.listen_host,
+            port=listener.port,
+            log_level="warning",
         )
         servers.append(_Server(cfg))
     return servers
@@ -62,7 +65,8 @@ def _cmd_serve(args) -> int:
     for listener in settings.listeners:
         console.print(
             f"[bold green]tokmeter[/] proxying "
-            f"http://{settings.listen_host}:{listener.port} -> {listener.upstream}"
+            f"http://{listener.host or settings.listen_host}:{listener.port} "
+            f"-> {listener.upstream}"
         )
     try:
         asyncio.run(_serve_until_signal(servers))
