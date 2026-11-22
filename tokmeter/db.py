@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 from dataclasses import asdict, dataclass
+from datetime import datetime
 from pathlib import Path
 
 SCHEMA = """
@@ -59,14 +60,37 @@ def insert_record(conn: sqlite3.Connection, record: UsageRecord) -> None:
     conn.commit()
 
 
+class DateFormatError(ValueError):
+    """A --since/--until value SQLite could not have parsed."""
+
+
+def parse_date(value: str, field: str) -> str:
+    """Normalize a caller-supplied date to YYYY-MM-DD.
+
+    SQLite's date() yields NULL for anything it cannot parse, and every
+    comparison against NULL is NULL — so an unparseable bound silently
+    filtered out every row and reported as "no usage recorded" rather than
+    as an error. Reject it here instead, before it reaches the query.
+    """
+    text = str(value).strip()
+    for fmt in ("%Y-%m-%d", "%Y%m%d"):
+        try:
+            return datetime.strptime(text, fmt).date().isoformat()
+        except ValueError:
+            continue
+    raise DateFormatError(
+        f"{field} must be YYYY-MM-DD or YYYYMMDD (got {value!r})"
+    )
+
+
 def _where(since=None, until=None, model=None):
     clauses, params = [], {}
     if since:
         clauses.append("date(ts) >= date(:since)")
-        params["since"] = since
+        params["since"] = parse_date(since, "since")
     if until:
         clauses.append("date(ts) <= date(:until)")
-        params["until"] = until
+        params["until"] = parse_date(until, "until")
     if model:
         clauses.append("model = :model")
         params["model"] = model

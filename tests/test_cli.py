@@ -162,3 +162,40 @@ def test_compare_without_references_shows_guidance(tmp_path, monkeypatch, capsys
     out = capsys.readouterr().out
     assert rc == 0
     assert "No reference models" in out
+
+
+def test_compare_rejects_malformed_since(tmp_path, monkeypatch, capsys):
+    path = seed(tmp_path)
+    pp = seed_pricing_with_references(tmp_path)
+    monkeypatch.setattr(cli.config, "db_path", lambda: path)
+    monkeypatch.setattr(cli.config, "pricing_path", lambda: pp)
+
+    rc = cli.main(["compare", "--since", "june 5th"])
+    out = capsys.readouterr().out
+    # Regression: this used to print a clean $0.00 table, indistinguishable
+    # from "the proxy recorded nothing".
+    assert rc == 2
+    assert "error" in out.lower()
+    assert "Recorded usage" not in out
+
+
+def test_compare_accepts_compact_since(tmp_path, monkeypatch, capsys):
+    path = seed(tmp_path)
+    pp = seed_pricing_with_references(tmp_path)
+    monkeypatch.setattr(cli.config, "db_path", lambda: path)
+    monkeypatch.setattr(cli.config, "pricing_path", lambda: pp)
+
+    rc = cli.main(["compare", "--since", "20260615"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "1,000,000" in out  # the seeded row survived the filter
+
+
+def test_report_rejects_malformed_until(tmp_path, monkeypatch, capsys):
+    path = seed(tmp_path)
+    monkeypatch.setattr(cli.config, "db_path", lambda: path)
+    monkeypatch.setattr(cli.config, "pricing_path", lambda: tmp_path / "missing.yaml")
+
+    rc = cli.main(["report", "--until", "garbage"])
+    assert rc == 2
+    assert "error" in capsys.readouterr().out.lower()

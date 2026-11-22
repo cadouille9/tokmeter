@@ -194,8 +194,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     rp = sub.add_parser("report", help="Print usage report")
     rp.add_argument("--by", choices=["model", "day"], default="model")
-    rp.add_argument("--since", help="YYYY-MM-DD (inclusive)")
-    rp.add_argument("--until", help="YYYY-MM-DD (inclusive)")
+    rp.add_argument("--since", help="YYYY-MM-DD or YYYYMMDD (inclusive)")
+    rp.add_argument("--until", help="YYYY-MM-DD or YYYYMMDD (inclusive)")
     rp.add_argument("--model", help="Filter to one model")
     rp.add_argument("--csv", help="Write rows to this CSV path instead of printing")
     rp.set_defaults(func=_cmd_report)
@@ -203,8 +203,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("models", help="List models seen and pricing state").set_defaults(func=_cmd_models)
 
     cp = sub.add_parser("compare", help="Compare cost vs reference cloud models")
-    cp.add_argument("--since", help="YYYY-MM-DD (inclusive)")
-    cp.add_argument("--until", help="YYYY-MM-DD (inclusive)")
+    cp.add_argument("--since", help="YYYY-MM-DD or YYYYMMDD (inclusive)")
+    cp.add_argument("--until", help="YYYY-MM-DD or YYYYMMDD (inclusive)")
     cp.add_argument("--model", help="Filter to one local model")
     cp.add_argument(
         "--by-model", action="store_true", help="Matrix: local models x references"
@@ -216,4 +216,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv=None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv if argv is not None else sys.argv[1:])
-    return args.func(args)
+    try:
+        return args.func(args)
+    except db.DateFormatError as exc:
+        console.print(f"[red]error:[/] {exc}")
+        return 2
