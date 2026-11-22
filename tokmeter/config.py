@@ -14,6 +14,8 @@ class Listener:
 class Settings:
     listen_host: str
     listeners: tuple[Listener, ...]
+    # (host or None, port) pairs serving GET /metrics; empty = disabled
+    metrics_listeners: tuple[tuple[str | None, int], ...] = ()
 
 
 def _parse_listeners(raw: str) -> tuple[Listener, ...]:
@@ -53,6 +55,28 @@ def _parse_listeners(raw: str) -> tuple[Listener, ...]:
     return tuple(listeners)
 
 
+def _parse_metrics(raw: str) -> tuple[tuple[str | None, int], ...]:
+    out: list[tuple[str | None, int]] = []
+    for item in raw.split(","):
+        item = item.strip()
+        if not item:
+            continue
+        host, sep, port_str = item.rpartition(":")
+        host = host.strip() if sep else None
+        if sep and not host:
+            raise ValueError(f"TOKMETER_METRICS entry {item!r} has an empty host")
+        try:
+            port = int(port_str.strip())
+        except ValueError:
+            raise ValueError(
+                f"TOKMETER_METRICS entry {item!r} must look like [HOST:]PORT"
+            ) from None
+        if (host, port) in out:
+            raise ValueError(f"TOKMETER_METRICS lists {item} more than once")
+        out.append((host, port))
+    return tuple(out)
+
+
 def load_settings() -> Settings:
     raw = os.environ.get("TOKMETER_LISTENERS")
     if raw is not None:
@@ -67,6 +91,7 @@ def load_settings() -> Settings:
     return Settings(
         listen_host=os.environ.get("TOKMETER_HOST", "127.0.0.1"),
         listeners=listeners,
+        metrics_listeners=_parse_metrics(os.environ.get("TOKMETER_METRICS", "")),
     )
 
 

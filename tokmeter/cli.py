@@ -13,9 +13,10 @@ from . import config, db, pricing, report
 console = Console()
 
 
-def _build_servers(settings: config.Settings, writer) -> list:
+def _build_servers(settings: config.Settings, writer, counters=None) -> list:
     import uvicorn
 
+    from .metrics import create_metrics_app
     from .proxy import create_app
 
     class _Server(uvicorn.Server):
@@ -36,6 +37,14 @@ def _build_servers(settings: config.Settings, writer) -> list:
             log_level="warning",
         )
         servers.append(_Server(cfg))
+    if settings.metrics_listeners and counters is not None:
+        upstreams = [listener.upstream for listener in settings.listeners]
+        for host, port in settings.metrics_listeners:
+            app = create_metrics_app(upstreams=upstreams, counters=counters)
+            cfg = uvicorn.Config(
+                app, host=host or settings.listen_host, port=port, log_level="warning"
+            )
+            servers.append(_Server(cfg))
     return servers
 
 
@@ -56,17 +65,23 @@ async def _serve_until_signal(servers) -> None:
 
 
 def _cmd_serve(args) -> int:
+    from .metrics import CountingWriter, UsageCounters
     from .writer import UsageWriter
 
     settings = config.load_settings()
     writer = UsageWriter(config.db_path())
     writer.start()
-    servers = _build_servers(settings, writer)
+    counters = UsageCounters()
+    servers = _build_servers(settings, CountingWriter(writer, counters), counters)
     for listener in settings.listeners:
         console.print(
             f"[bold green]tokmeter[/] proxying "
             f"http://{listener.host or settings.listen_host}:{listener.port} "
             f"-> {listener.upstream}"
+        )
+    for host, port in settings.metrics_listeners:
+        console.print(
+            f"[bold green]tokmeter[/] metrics on http://{host or settings.listen_host}:{port}/metrics"
         )
     try:
         asyncio.run(_serve_until_signal(servers))

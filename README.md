@@ -97,6 +97,29 @@ services that hold the same port on a specific address (e.g. `tailscale serve`).
 Each listener proxies to its own upstream; all requests land in the same
 database, distinguished by the `upstream` column.
 
+### Prometheus metrics
+
+Set `TOKMETER_METRICS` to comma-separated `[HOST:]PORT` entries to serve
+`GET /metrics` (off by default):
+
+    TOKMETER_METRICS=9188,192.168.1.252:9188 .venv/bin/tokmeter serve
+
+Each scrape probes every distinct upstream (`/v1/models`, then its own
+`/metrics`) and returns, in one exposition:
+
+- `tokmeter_backend_up{upstream}`, `tokmeter_backend_info{upstream,backend,model}`
+  and `tokmeter_backend_metrics_ok{upstream}`;
+- `tokmeter_requests_total`, `tokmeter_tokens_total{kind="prompt|completion"}`
+  and `tokmeter_request_seconds_total` for proxied traffic (in-process counters
+  that reset on restart, so query them with `rate()`/`increase()`);
+- every upstream's own metrics (vLLM `vllm:*`, Strata `vllm:*` + `strata:*`,
+  llama.cpp `llamacpp:*` when started with `--metrics`) with `backend` and
+  `upstream` labels added. Families shared by several upstreams are merged, so
+  the output stays valid when two servers export the same metric names.
+
+One scrape target therefore covers all local backends, and Prometheus never has
+to reach servers that only listen on loopback.
+
 ### Point your clients at the proxy
 
 Change your client base URL from the backend port to the proxy:
