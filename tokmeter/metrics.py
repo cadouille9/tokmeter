@@ -56,33 +56,51 @@ def _labels(**labels) -> str:
 
 
 class UsageCounters:
-    """In-process counters fed by every usage record (reset on restart; use rate())."""
+    """In-process counters fed by every usage record (reset on restart; use rate()).
+
+    A label set only exists once its first request finished. Exposing it straight
+    away with that request's count would hide the count from increase()/rate():
+    Prometheus cannot see an increase in a series' first sample. So a new series is
+    rendered once at 0 and its increments are applied after that render ("held").
+    """
 
     def __init__(self):
         self._lock = threading.Lock()
         self.requests: dict[tuple, int] = {}
         self.tokens: dict[tuple, int] = {}
         self.seconds: dict[tuple, float] = {}
+        self._held: dict[tuple[str, tuple], float] = {}
+
+    def _add(self, name: str, key: tuple, amount) -> None:
+        series = getattr(self, name)
+        if key not in series:
+            series[key] = 0
+            self._held[(name, key)] = amount
+        elif (name, key) in self._held:
+            self._held[(name, key)] += amount
+        else:
+            series[key] += amount
 
     def observe(self, record: UsageRecord) -> None:
         up = upstream_label(record.upstream)
         model = record.model or "unknown"
         with self._lock:
-            rkey = (up, model, record.endpoint or "", str(record.status))
-            self.requests[rkey] = self.requests.get(rkey, 0) + 1
+            self._add("requests", (up, model, record.endpoint or "", str(record.status)), 1)
             for kind, n in (("prompt", record.prompt_tokens), ("completion", record.completion_tokens)):
                 if n:
-                    tkey = (up, model, kind)
-                    self.tokens[tkey] = self.tokens.get(tkey, 0) + int(n)
+                    self._add("tokens", (up, model, kind), int(n))
             if record.duration_ms is not None:
-                skey = (up, model)
-                self.seconds[skey] = self.seconds.get(skey, 0.0) + record.duration_ms / 1000.0
+                self._add("seconds", (up, model), record.duration_ms / 1000.0)
 
     def render(self) -> list[str]:
         with self._lock:
             requests = dict(self.requests)
             tokens = dict(self.tokens)
             seconds = dict(self.seconds)
+            # new series have now been shown at 0: release what they were holding
+            for (name, key), amount in self._held.items():
+                getattr(self, name)[key] += amount
+            self._held.clear()
         out = [
             "# HELP tokmeter_requests_total LLM requests proxied by tokmeter.",
             "# TYPE tokmeter_requests_total counter",

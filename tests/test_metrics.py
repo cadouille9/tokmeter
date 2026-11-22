@@ -1,3 +1,5 @@
+from typing import Any
+
 import httpx
 import pytest
 from starlette.testclient import TestClient
@@ -16,7 +18,7 @@ from tokmeter.metrics import (
 
 
 def rec(**kw):
-    base: dict = dict(
+    base: dict[str, Any] = dict(
         ts="2026-11-22T00:00:00+00:00",
         model="m1",
         endpoint="chat/completions",
@@ -123,12 +125,27 @@ def test_counting_writer_counts_and_delegates():
     w.write(rec())
     w.write(rec(prompt_tokens=None, completion_tokens=5, duration_ms=500))
     assert len(inner.records) == 2
+    counters.render()  # new series are exposed at 0 once
     text = "\n".join(counters.render())
     labels = 'upstream="127.0.0.1:8080",model="m1"'
     assert f'tokmeter_requests_total{{{labels},endpoint="chat/completions",status="200"}} 2' in text
     assert f'tokmeter_tokens_total{{{labels},kind="prompt"}} 100' in text
     assert f'tokmeter_tokens_total{{{labels},kind="completion"}} 25' in text
     assert f"tokmeter_request_seconds_total{{{labels}}} 2.000" in text
+
+
+def test_new_series_start_at_zero_so_increase_sees_first_request():
+    counters = UsageCounters()
+    counters.observe(rec(prompt_tokens=37388))
+    first = "\n".join(counters.render())
+    assert 'kind="prompt"} 0' in first
+    assert 'tokmeter_requests_total{upstream="127.0.0.1:8080",model="m1",endpoint="chat/completions",status="200"} 0' in first
+    counters.observe(rec(prompt_tokens=12))  # arrives before the next scrape: still counted
+    second = "\n".join(counters.render())
+    assert 'kind="prompt"} 37400' in second
+    assert 'status="200"} 2' in second
+    counters.observe(rec(prompt_tokens=100))  # existing series: counted immediately
+    assert 'kind="prompt"} 37500' in "\n".join(counters.render())
 
 
 # ---------------------------------------------------------------- /metrics app
